@@ -78,7 +78,8 @@ contract HashFunction {
         else if (keccak256(abi.encode(_winner)) == keccak256(abi.encode("B"))){
             multiplier = oddsPlayerB;
         }
-        for (uint256 i=0; i <= getLength(); ++i){
+        uint256 i;
+        while (i < getLength()){
             Customer storage getPlayer = customers[i];
             if (keccak256(abi.encode(getPlayer.player)) == keccak256(abi.encode(_winner))){
                 getPlayer.betAmount = getPlayer.betAmount * multiplier;
@@ -86,6 +87,7 @@ contract HashFunction {
             } else {
                 getPlayer.betAmount = 0;
             }
+            ++i;
         }
     }
 }
