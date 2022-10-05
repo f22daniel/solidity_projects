@@ -1,0 +1,91 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.15;
+
+contract HashFunction {
+    address public owner;
+    uint256 public oddsPlayerA;
+    uint256 public oddsPlayerB;
+    uint256 deadline;
+    Customer[] public customers;
+
+    struct Customer{
+        uint256 betAmount;
+        string player;
+        address participant;
+    }
+    modifier onlyOwner{
+        require(owner == msg.sender, "Not owner");
+        _;
+    }
+    modifier minBalance{
+        require(address(msg.sender).balance > msg.value, "Insufficient funds");
+        _;
+    }
+    modifier closedBetting{
+        require(block.timestamp <= deadline, "Betting closed!");
+        _;
+    }
+    constructor(uint8 _A,uint8 _B,uint16 time) {
+        oddsPlayerA = _A;
+        oddsPlayerB = _B;
+        deadline = block.timestamp + time * 1 hours;
+        owner = msg.sender;
+    }
+    function addCapital() external payable onlyOwner minBalance {}
+
+    function remainingTime() view public returns(uint256){
+        uint256 remain = deadline - block.timestamp;
+        return remain / 1 minutes;
+    }
+    function getLength() view public returns(uint256) {
+        return customers.length;
+    }
+    function getBalance() view public returns(uint256) {
+        return address(this).balance;
+    }
+
+    function placeBet(string memory _player, uint8 _age) external payable closedBetting minBalance{
+        require(_age >= 18, "Betting only allowed for 18+");
+        require(keccak256(abi.encode(_player)) == keccak256(abi.encode("A")) || keccak256(abi.encode(_player)) == keccak256(abi.encode("B")), "Invalid player");
+        uint256 i = 0;
+        while (i < getLength()) {
+            Customer storage uniqueAddress = customers[i];
+            require(uniqueAddress.participant != msg.sender, "Address not unique");
+            i++;
+        }
+        customers.push(Customer(msg.value, _player, msg.sender));
+    }
+    function refund() external closedBetting{
+        uint256 i = 0;
+        while (i <= getLength()) {
+            Customer storage uniqueAddress = customers[i];
+            if (uniqueAddress.participant == msg.sender){
+                payable(msg.sender).transfer(uniqueAddress.betAmount);
+                for (uint256 x = i; x < getLength()-1; ++x){
+                customers[x] = customers[x+1];
+                }
+            customers.pop();
+            break;
+            }
+            ++i;
+        }   
+    }
+    function declareWinner(string memory _winner) external onlyOwner {
+        uint256 multiplier;
+        if (keccak256(abi.encode(_winner)) == keccak256(abi.encode("A"))){
+            multiplier = oddsPlayerA;
+        }
+        else if (keccak256(abi.encode(_winner)) == keccak256(abi.encode("B"))){
+            multiplier = oddsPlayerB;
+        }
+        for (uint256 i=0; i <= getLength(); ++i){
+            Customer storage getPlayer = customers[i];
+            if (keccak256(abi.encode(getPlayer.player)) == keccak256(abi.encode(_winner))){
+                getPlayer.betAmount = getPlayer.betAmount * multiplier;
+                payable(msg.sender).transfer(address(this).balance);
+            } else {
+                getPlayer.betAmount = 0;
+            }
+        }
+    }
+}
